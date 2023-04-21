@@ -3,6 +3,8 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 
+import scala.math.Ordered.orderingToOrdered
+
 class PersistentBankAccount {
 
   //commands = messages
@@ -34,11 +36,22 @@ class PersistentBankAccount {
 
   val commandHandler: (BankAccount, Command) => Effect[Event, BankAccount] = (state, command) =>
     command match {
-      case CreateBankAccount(user, currency, initialBalance, replyTo) =>
+      case CreateBankAccount(user, currency, initialBalance, bank) =>
         val id = state.id
         Effect
           .persist(BankAccountCreated(BankAccount(id, user, currency, initialBalance))) //persisted into Cassandra
-        .thenReply(replyTo)(_ => BankAccountCreatedResponse(id))
+        .thenReply(bank)(_ => BankAccountCreatedResponse(id))
+      case UpdateBalance(_, _, amount, replyTo) =>
+        val newBalance = state.balance + amount : Unit
+        //check here for withdrawal
+      if (newBalance < 0) //ilegal
+        Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(None))
+      else
+        Effect
+        .persist(BalanceUpdated(amount))
+        .thenReply(bank)(newState => BankAccountBalanceUpdatedResponse(Some(newState)))
+      case GetBankAccount(_, bank) =>
+        Effect.reply(bank)(GetBankAccountResponse(Some(state)))
     }
   val eventHandler: (BankAccount, Event) => BankAccount = ???
 
