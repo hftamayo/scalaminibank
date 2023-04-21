@@ -35,7 +35,10 @@ class PersistentBankAccount {
   val commandHandler: (BankAccount, Command) => Effect[Event, BankAccount] = (state, command) =>
     command match {
       case CreateBankAccount(user, currency, initialBalance, replyTo) =>
-        val id = state.id : Unit
+        val id = state.id
+        Effect
+          .persist(BankAccountCreated(BankAccount(id, user, currency, initialBalance))) //persisted into Cassandra
+        .thenReply(replyTo)(_ => BankAccountCreatedResponse(id))
     }
   val eventHandler: (BankAccount, Event) => BankAccount = ???
 
