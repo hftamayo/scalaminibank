@@ -1,4 +1,5 @@
-package com.hftamayo.actors
+package com.hftamayo.bank.actors
+
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
