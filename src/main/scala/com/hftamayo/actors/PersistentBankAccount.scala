@@ -41,19 +41,24 @@ class PersistentBankAccount {
         Effect
           .persist(BankAccountCreated(BankAccount(id, user, currency, initialBalance))) //persisted into Cassandra
         .thenReply(bank)(_ => BankAccountCreatedResponse(id))
-      case UpdateBalance(_, _, amount, replyTo) =>
+      case UpdateBalance(_, _, amount, bank) =>
         val newBalance = state.balance + amount : Unit
         //check here for withdrawal
       if (newBalance < 0) //ilegal
-        Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(None))
+        Effect.reply(bank)(BankAccountBalanceUpdatedResponse(None))
       else
         Effect
         .persist(BalanceUpdated(amount))
         .thenReply(bank)(newState => BankAccountBalanceUpdatedResponse(Some(newState)))
-      case GetBankAccount(_, bank) =>
-        Effect.reply(bank)(GetBankAccountResponse(Some(state)))
+      case GetBankAccount(_, replyTo) =>
+        Effect.reply(replyTo)(GetBankAccountResponse(Some(state)))
     }
-  val eventHandler: (BankAccount, Event) => BankAccount = ???
+  val eventHandler: (BankAccount, Event) => BankAccount = (state, event) =>
+    event match {
+      case BankAccountCreated(bankAccount) => bankAccount
+      case BalanceUpdated(amount) => state.copy(balance = state.balance + amount)
+
+    }
 
   def apply(id: String): Behavior[Command] =
     EventSourcedBehavior[Command, Event, BankAccount](
