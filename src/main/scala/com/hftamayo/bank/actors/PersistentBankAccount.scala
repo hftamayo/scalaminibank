@@ -8,28 +8,8 @@ import scala.math.Ordered.orderingToOrdered
 
 class PersistentBankAccount {
 
-  //commands = messages
-  sealed trait Command
-  object Command {
-    case class CreateBankAccount(user: String, currency: String, initialBalance: Double, replyTo: ActorRef[Response]) extends Command
-    case class UpdateBalance(id: String, currency: String, amount: Double /* can be <0 */ , replyTo: ActorRef[Response]) extends Command
-    case class GetBankAccount(id: String, replyTo: ActorRef[Response]) extends Command
-  }
-  import Command._
-
-  //events = to persist to Cassndra
-  trait Event
-  case class BankAccountCreated(bankAccount: BankAccount) extends Event
-  case class BalanceUpdated(amount: Double) extends Event
-
-  //state
-  case class BankAccount(id: String, user: String, currency: String, balance: Double)
-
-  //responses
-  sealed trait Response
-  case class BankAccountCreatedResponse(id: String) extends Response
-  case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Option[BankAccount]) extends Response
-  case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
+  import PersistentBankAccount._
+  import PersistentBankAccount.Command._
 
   //command handler = message handler => persist an event
 
@@ -71,8 +51,26 @@ class PersistentBankAccount {
       commandHandler = commandHandler,
       eventHandler = eventHandler
     )
+}
 
+object PersistentBankAccount{
+  sealed trait Command
+  object Command {
+    case class CreateBankAccount(user: String, currency: String, initialBalance: Double, replyTo: ActorRef[Response]) extends Command
+    case class UpdateBalance(id: String, currency: String, amount: Double /* can be <0 */ , replyTo: ActorRef[Response]) extends Command
+    case class GetBankAccount(id: String, replyTo: ActorRef[Response]) extends Command
+  }
 
+  //events = to persist to Cassndra
+  trait Event
+  case class BankAccountCreated(bankAccount: BankAccount) extends Event
+  case class BalanceUpdated(amount: Double) extends Event
+  //state
+  case class BankAccount(id: String, user: String, currency: String, balance: Double)
 
-
+  //responses
+  sealed trait Response
+  case class BankAccountCreatedResponse(id: String) extends Response
+  case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Option[BankAccount]) extends Response
+  case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
 }
