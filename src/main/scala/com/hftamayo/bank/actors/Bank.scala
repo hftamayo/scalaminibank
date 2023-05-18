@@ -1,5 +1,6 @@
 package com.hftamayo.bank.actors
 
+import akka.NotUsed
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.persistence.typed.PersistenceId
@@ -38,20 +39,40 @@ class Bank {
           case None =>
             Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(None))
         }
-      case GetBankAccount(id, replyTo) =>
+      case getCmd @ GetBankAccount(id, replyTo) =>
         state.accounts.get(id) match {
           case Some(account) =>
+            Effect.reply(account)(getCmd)
+          case None =>
+            Effect.reply(replyTo)(GetBankAccountResponse(None)) //failed search
         }
     }
   //event handler
-  val eventHandler: (State, Event) => State = ???
+  def eventHandler(context: ActorContext[Command]): (State, Event) => State = (state, event) =>
+    event match {
+      case BankAccountCreated(id) =>
+        val account = context.child(id) //exists after command handler
+          .getOrElse(context.spawn(PersistentBankAccount(id), id)) // does not exist in recovery mode
+          .asInstanceOf[ActorRef[Command]]
+        state.copy(state.accounts + (id -> account))
+
+    }
   //behavior
   def apply(): Behavior[Command] = Behaviors.setup { context =>
     EventSourcedBehavior[Command, Event, State](
       persistenceId = PersistenceId.ofUniqueId("bank"),
       emptyState = State(Map()),
       commandHandler = commandHandler(context),
-      eventHandler = eventHandler
+      eventHandler = eventHandler(context)
     )
+  }
+}
+
+object BankPlayground {
+  def main(args: Array[String]): Unit = {
+    val rootBehavior: Behavior[NotUsed] = Behaviors.setup { context =>
+      val bank = context.spawn(Bank(), "bank")
+    }
+
   }
 }
